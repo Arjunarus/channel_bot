@@ -1,4 +1,4 @@
 token
 .idea
 .venv
-*.session
+*.session*

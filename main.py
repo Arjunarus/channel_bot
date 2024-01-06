@@ -2,7 +2,9 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
-from telethon import TelegramClient, events, Button
+
+import telethon.errors.rpcerrorlist
+from telethon import TelegramClient, events, Button, errors
 
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), 'token')
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.DEBUG)
@@ -41,17 +43,25 @@ async def my_event_handler(event):
     sender = await event.get_sender()
     sender_id = event.sender_id
     taglen = len(client_table[sender_id])
-    message = event.message.to_dict()['message']
-    if taglen == 0 and message == '/start':
-        await client.send_message(entity=sender_id, **ENTRY_POINT)
-    elif taglen == 2:
-        post = f'Предложил {sender.first_name} {sender.last_name}\n' \
-               f'{message}\n' \
-               f'{" ".join(client_table[sender_id])}'
-        client_table.pop(sender_id)
-        await client.send_message(entity=TEMPLE_CHANNEL_ID, message=post)
-    else:
-        await client.delete_messages(entity=event.chat_id, message_ids=event.message.id)
+    message = event.message
+    message_text = message.text
+    try:
+        if taglen == 0 and message_text == '/start':
+            await client.send_message(entity=sender_id, **ENTRY_POINT)
+        elif taglen == 2:
+            post = f'Предложено @{sender.username}\n' \
+                   f'{message_text}\n' \
+                   f'{" ".join(client_table[sender_id])}'
+            client_table.pop(sender_id)
+            message.text = post
+            await client.send_message(entity=TEMPLE_CHANNEL_ID, message=post)
+            # NOTE: For debugging
+            # await client.send_message(entity=sender_id, message=message)
+        else:
+            await client.delete_messages(entity=event.chat_id, message_ids=event.message.id)
+    except errors.RPCError as er:
+        client_table[sender_id] = []
+        await client.send_message(entity=sender_id, message=f'Error: {er.message}\nПопробуйте снова.')
 
 
 @client.on(events.CallbackQuery())
