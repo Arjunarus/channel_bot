@@ -2,12 +2,10 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
-
-import telethon.errors.rpcerrorlist
 from telethon import TelegramClient, events, Button, errors
 
 TOKEN_FILE = os.path.join(os.path.dirname(__file__), 'token')
-logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.DEBUG)
+logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.WARNING)
 
 with open(TOKEN_FILE, 'r') as tokenfile:
     api_id, api_hash = tokenfile.readline().strip().split(':')
@@ -51,7 +49,7 @@ async def my_event_handler(event):
         elif taglen == 2:
             post = f'Предложено @{sender.username}\n' \
                    f'{message_text}\n' \
-                   f'{" ".join(client_table[sender_id])}'
+                   f'{" ".join(HASHTAGS.get(dat, "") for dat in client_table[sender_id])}'
             client_table.pop(sender_id)
             message.text = post
             await client.send_message(entity=TEMPLE_CHANNEL_ID, message=post)
@@ -64,21 +62,45 @@ async def my_event_handler(event):
         await client.send_message(entity=sender_id, message=f'Error: {er.message}\nПопробуйте снова.')
 
 
+def get_invite_message(sender_id):
+    flavors = set(client_table[sender_id])
+    kind = list(flavors.intersection({b'question', b'problem', b'interesting'}))[0]
+    kind_txt = {
+        b'question': 'ваш вопрос',
+        b'problem': 'вашу задачу',
+        b'interesting': 'интересный пост'
+    }[kind]
+    ending = {
+        b'question': 'ым',
+        b'problem': 'ой',
+        b'interesting': 'ым'
+    }[kind]
+    topic = {
+        b'math': ' по математике',
+        b'cs': ' по информатике',
+        b'elec': ' по электронике',
+        b'other': ''
+    }[list(flavors.intersection({b'math', b'cs', b'elec', b'other'}))[0]]
+
+    return f'Введите {kind_txt}{topic}, котор{ending} вы хотели поделиться.'
+
+
 @client.on(events.CallbackQuery())
 async def callback(event):
     sender_id = event.sender_id
-    if event.data in HASHTAGS:
-        client_table[sender_id].append(HASHTAGS[event.data])
+    client_table[sender_id].append(event.data)
 
-    if event.data in [b'post', b'cancel']:
+    if event.data == b'cancel':
         client_table[sender_id] = []
         await event.edit(ENTRY_POINT['message'], buttons=ENTRY_POINT['buttons'])
     elif event.data in [b'question', b'problem', b'interesting']:
         await event.edit('Выберите тему: ', buttons=[
             [
                 Button.inline(text='Математика', data='math'),
-                Button.inline(text='Информатика (CS)', data='cs'),
                 Button.inline(text='Электроника', data='elec')
+            ],
+            [
+                Button.inline(text='Информатика (CS)', data='cs')
             ],
             [
                 Button.inline(text='Другое', data='other'),
@@ -86,7 +108,7 @@ async def callback(event):
             ]
         ])
     else:
-        await event.edit('Введите ваше сообщение для канала', buttons=Button.inline(text='Отмена', data='cancel'))
+        await event.edit(get_invite_message(sender_id), buttons=Button.inline(text='Отмена', data='cancel'))
 
 
 client.run_until_disconnected()
