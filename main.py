@@ -1,15 +1,14 @@
-import asyncio
 import logging
-import os
 from collections import defaultdict
+from pathlib import Path
+
 from telethon import TelegramClient, events, Button, errors
 
-TOKEN_FILE = os.path.join(os.path.dirname(__file__), 'token')
+TOKEN_FILE = Path(__file__).absolute().parent / 'token'
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.WARNING)
 
-with open(TOKEN_FILE, 'r') as tokenfile:
-    api_id, api_hash = tokenfile.readline().strip().split(':')
-    bot_token = tokenfile.readline().strip()
+(api_token, bot_token) = TOKEN_FILE.read_text().splitlines()
+api_id, api_hash = api_token.split(':')
 
 client = TelegramClient('LuzinChannelBot', api_id, api_hash).start(bot_token=bot_token)
 
@@ -52,7 +51,7 @@ async def my_event_handler(event):
                    f'{" ".join(HASHTAGS.get(dat, "") for dat in client_table[sender_id])}'
             client_table.pop(sender_id)
             message.text = post
-            await client.send_message(entity=TEMPLE_CHANNEL_ID, message=post)
+            await client.send_message(entity=TEMPLE_CHANNEL_ID, message=message)
             # NOTE: For debugging
             # await client.send_message(entity=sender_id, message=message)
         else:
