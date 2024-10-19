@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from typing import Dict, List, Any, Iterable, Generator
+from typing import Dict, List
 
 from telethon import TelegramClient, events, Button, errors
 
